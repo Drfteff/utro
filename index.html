@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Утро</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Мини-приложение бота «Новости»: три экрана — Вакансии, Новости, Штаб.
+   Данные приходят зашифрованными (data.enc), ключ — в ссылке кнопки, после «#». */
+:root{
+  --bg:#000;--cell:#1C1C1E;--cell-2:#2C2C2E;--line:rgba(84,84,88,.55);
+  --text:#fff;--text-2:rgba(235,235,245,.64);--text-3:rgba(235,235,245,.34);
+  --green:#30D158;--orange:#FF9F0A;--red:#FF453A;--blue:#0A84FF;--indigo:#8E8CFF;--yellow:#FFD60A;--teal:#64D2FF;--gray:#8E8E93;
+  --tint:var(--blue);
+  --round:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,Roboto,sans-serif;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Roboto,"Segoe UI",sans-serif;
+  --top:var(--tg-content-safe-area-inset-top,0px);
+  --bottom:max(env(safe-area-inset-bottom,0px),var(--tg-safe-area-inset-bottom,0px));
+}
+body[data-s=jobs]{--tint:var(--green)}
+body[data-s=news]{--tint:var(--blue)}
+body[data-s=shtab]{--tint:var(--orange)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font:17px/1.36 var(--sans);letter-spacing:-.2px;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;overflow-x:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--tint);outline-offset:2px}
+main{max-width:560px;margin:0 auto;padding:calc(var(--top) + 18px) 16px calc(var(--bottom) + 40px)}
+
+/* шапка экрана: дата, крупный заголовок цветом экрана, одна фраза */
+.date{font:600 15px/1.2 var(--sans);color:var(--text-2);margin:0 4px}
+h1{font:800 38px/1.05 var(--round);letter-spacing:-.8px;color:var(--tint);margin:6px 4px 0}
+.lead{font-size:17px;line-height:1.35;color:var(--text-2);margin:10px 4px 0;text-wrap:pretty}
+.stale{margin:16px 0 0;padding:12px 14px;border-radius:14px;background:rgba(255,214,10,.12);color:var(--yellow);font-size:15px}
+
+/* разделы */
+h2{font:700 21px/1.2 var(--round);letter-spacing:-.3px;margin:30px 4px 10px;display:flex;align-items:baseline;gap:8px}
+h2 small{font:500 16px/1 var(--sans);color:var(--text-3);letter-spacing:0}
+.group{background:var(--cell);border-radius:22px;overflow:hidden}
+
+/* строка списка */
+.row{display:flex;align-items:center;gap:13px;width:100%;padding:12px 16px;min-height:64px;position:relative}
+.row+.row::before{content:"";position:absolute;top:0;right:0;left:66px;border-top:.5px solid var(--line)}
+.row.plain+.row.plain::before{left:50px}
+.tile{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:21px;
+  background:color-mix(in srgb,var(--c,var(--tint)) 22%,transparent)}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.t{font-weight:600;line-height:1.25;text-wrap:pretty}
+.s{font-size:15px;line-height:1.3;color:var(--text-2)}
+.chev{flex:none;width:9px;height:9px;border:solid var(--text-3);border-width:2.5px 2.5px 0 0;transform:rotate(45deg);margin-right:3px}
+button.row:active{background:var(--cell-2)}
+.dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--c)}
+.mark{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:800 14px/1 var(--round);color:#000;background:var(--c)}
+.state{flex:none;font:600 13px/1 var(--sans);color:var(--c);padding:6px 9px;border-radius:999px;background:color-mix(in srgb,var(--c) 16%,transparent)}
+.chat{display:inline-block;margin-top:4px;font:600 13px/1 var(--sans);color:var(--tint)}
+.more{color:var(--text-2)}
+.fold{display:none}
+.fold.open{display:block}
+
+/* карточка новости */
+.card{display:block;width:100%;background:var(--cell);border-radius:24px;padding:18px 18px 16px;margin-top:12px}
+.card:active{transform:scale(.985)}
+.src{display:flex;align-items:center;gap:9px;font:600 14px/1 var(--sans);color:var(--text-2)}
+.logo{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font:800 13px/1 var(--round);color:#fff;background:var(--c,var(--gray))}
+.card h3{font:700 21px/1.22 var(--round);letter-spacing:-.4px;margin:12px 0 6px;text-wrap:pretty}
+.card p{margin:0;color:var(--text-2);font-size:16px;line-height:1.38;text-wrap:pretty}
+.us{margin-top:14px;padding:12px 14px;border-radius:16px;background:rgba(94,92,230,.2);font-size:16px;line-height:1.35}
+.us b{display:block;font:700 13px/1 var(--round);color:var(--indigo);margin-bottom:6px}
+.card.big{background:linear-gradient(rgba(255,69,58,.16),rgba(255,69,58,.16)),var(--cell)}
+.card.big .flag{font-size:30px;line-height:1}
+
+/* Штаб: сколько дней до главной даты */
+.count{margin-top:20px;background:var(--cell);border-radius:28px;padding:20px 22px 22px;display:grid;grid-template-columns:auto 1fr;column-gap:18px;align-items:end}
+.count .n{font:800 76px/.86 var(--round);letter-spacing:-3px;color:var(--tint);grid-row:span 2}
+.count .what{font:700 20px/1.2 var(--round);letter-spacing:-.3px;align-self:end}
+.count .when{font-size:15px;color:var(--text-2);margin-top:4px}
+.cal{flex:none;width:46px;border-radius:11px;overflow:hidden;background:var(--cell-2);text-align:center}
+.cal i{display:block;font:700 11px/1 var(--sans);font-style:normal;color:#fff;background:var(--red);padding:4px 0 3px}
+.cal b{display:block;font:700 21px/1 var(--round);padding:5px 0 6px}
+.words .t{font:700 18px/1.25 var(--round);color:var(--tint)}
+.words .s{font-size:16px;color:var(--text);opacity:.85;margin-top:2px}
+.words .row{padding:13px 16px}
+.note-line{margin:14px 4px 0;font-size:14px;line-height:1.4;color:var(--text-3)}
+
+/* пусто или ошибка */
+.plain{margin:0 0 10px;padding:14px 16px;border-radius:16px;background:var(--cell);font-size:16px;line-height:1.4;cursor:pointer}
+.tech{margin:18px 4px 0;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--text-3);word-break:break-word}
+.empty{margin-top:22px;background:var(--cell);border-radius:22px;padding:22px 20px;color:var(--text-2);line-height:1.4}
+.empty b{display:block;color:var(--text);font:700 19px/1.25 var(--round);margin-bottom:6px}
+
+/* окно вакансии снизу */
+.shade{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .25s}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;max-height:calc(100% - var(--top) - 34px);overflow-y:auto;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#151517;border-radius:30px 30px 0 0;
+  padding:10px 18px calc(var(--bottom) + 22px);transform:translateY(105%);transition:transform .34s cubic-bezier(.2,.9,.25,1)}
+.open-sheet .shade{opacity:1;pointer-events:auto}
+.open-sheet .sheet{transform:none}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--text-3);margin:0 auto 18px}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:7px 13px 7px 11px;border-radius:999px;font:700 14px/1 var(--round);
+  color:var(--c);background:color-mix(in srgb,var(--c) 17%,transparent)}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.sheet h3{font:800 27px/1.12 var(--round);letter-spacing:-.6px;margin:14px 0 6px;text-wrap:pretty}
+.org{color:var(--text-2);font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.chip{padding:7px 12px;border-radius:999px;background:var(--cell-2);font-size:14px;line-height:1.1}
+.lede{font-size:18px;line-height:1.4;margin:18px 0 0;text-wrap:pretty}
+.notes{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.note{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border-radius:16px;font-size:16px;line-height:1.35;
+  background:color-mix(in srgb,var(--c) 14%,transparent)}
+.note .mark{margin-top:-1px}
+.facts{margin-top:18px;background:var(--cell);border-radius:18px;overflow:hidden}
+.fact{padding:11px 16px;position:relative}
+.fact+.fact::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+.fact span{display:block;font-size:13px;color:var(--text-3);margin-bottom:2px}
+.fact div{font-size:16px;line-height:1.35}
+.orig{font-size:13px;line-height:1.4;color:var(--text-3);margin:12px 4px 0}
+.btns{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.btn{width:100%;text-align:center;padding:16px;border-radius:16px;font:700 17px/1 var(--round)}
+.btn.main{background:var(--tint);color:#000}
+.btn.alt{background:var(--cell-2);color:var(--tint)}
+.btn:active{opacity:.75}
+.toast{position:fixed;left:50%;bottom:calc(var(--bottom) + 26px);transform:translate(-50%,20px);opacity:0;transition:.25s;
+  background:#3A3A3C;color:#fff;padding:12px 18px;border-radius:999px;font-size:15px;white-space:nowrap;pointer-events:none;z-index:5}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){.sheet,.shade,.toast{transition:none}.card:active{transform:none}}
+</style>
+</head>
+<body>
+<main id="app"><div class="empty"><b>Открываю…</b></div></main>
+<div class="shade" id="shade"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+(function () {  // всё своё — внутри, чтобы чужие скрипты на странице (Telegram) ничего не задели
+const W = window.Telegram && window.Telegram.WebApp;
+const tg = W && (W.initData || (W.platform && W.platform !== "unknown")) ? W : null;  // открыто внутри Telegram
+const S = new URLSearchParams(location.search).get("s") || "jobs";
+document.body.dataset.s = S;
+
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false && c !== "") el.append(c instanceof Node ? c : nb(c));
+  return el;
+}
+/* короткие слова, тире и валюта не остаются одни в конце или начале строки */
+const SHORT = /(^|[\s(«])(в|во|и|с|со|к|о|об|у|а|на|по|для|без|из|за|от|до|не|ни|но|или)\s/gi;
+const nb = t => String(t).replace(SHORT, "$1$2\u00a0").replace(SHORT, "$1$2\u00a0")
+  .replace(/\s(—|–)/g, "\u00a0$1").replace(/(\d)\s(?=\d{3}\b)/g, "$1\u00a0").replace(/\s(?=[$€£₴]|лей\b|грн\b)/g, "\u00a0");
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+const day = iso => { const [y, m, d] = String(iso).split("-").map(Number); return new Date(y, m - 1, d); };
+const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); };
+const daysTo = iso => Math.round((day(iso) - today()) / 864e5);
+const longDate = d => cap(d.toLocaleDateString("ru-RU", {weekday: "long", day: "numeric", month: "long"}));
+const shortDate = d => d.toLocaleDateString("ru-RU", {day: "numeric", month: "long"});
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 10, b = Math.abs(n) % 100;
+  return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many;
+}
+const known = s => s && !/^не (указан|указано|указана)/i.test(s.trim());
+function haptic(kind) { try { tg && tg.HapticFeedback && (kind ? tg.HapticFeedback.impactOccurred(kind) : tg.HapticFeedback.selectionChanged()); } catch (e) {} }
+function openLink(url) {
+  if (!/^https:\/\/\S+$/.test(url || "")) return;
+  haptic("light");
+  if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank", "noopener");
+}
+function toast(text) {
+  const t = document.getElementById("toast");
+  t.textContent = text; t.classList.add("on");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 2600);
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+  const ta = h("textarea", {style: "position:fixed;top:0;opacity:0"}); ta.value = text;
+  document.body.append(ta); ta.select();
+  let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+  ta.remove(); return ok;
+}
+
+/* ───── данные: data.enc, AES-256-CBC, ключ «k=» в ссылке кнопки ───── */
+function b64(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(s + "=".repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
+}
+function secret() {
+  // ключ: в ссылке (?k=…), по-старому после «#k=…», или сохранённый с прошлого раза
+  const KEY = /^[A-Za-z0-9_-]{40,}$/;
+  let k = new URLSearchParams(location.search).get("k");
+  if (!KEY.test(k || "")) { const m = (location.hash || "").match(/(?:^#|[#&?])k=([A-Za-z0-9_-]{40,})/); k = m && m[1]; }
+  try { if (KEY.test(k || "")) localStorage.setItem("utro-k", k); else k = localStorage.getItem("utro-k"); } catch (e) {}
+  // убрать ключ из адресной строки (данные Telegram после «#» не трогаем)
+  try { const q = new URLSearchParams(location.search); if (q.has("k")) { q.delete("k"); history.replaceState(null, "", location.pathname + "?" + q + location.hash); } } catch (e) {}
+  return KEY.test(k || "") ? k : null;
+}
+async function load() {
+  if (window.UTRO_DATA) return window.UTRO_DATA;
+  const k = secret();
+  if (!k) throw new Error("nokey");
+  let res;
+  try { res = await fetch("data.enc?t=" + Date.now(), {cache: "no-store"}); } catch (e) { throw new Error("net"); }
+  if (!res.ok) throw new Error("net");
+  const raw = b64((await res.text()).trim());
+  if (!(window.crypto && crypto.subtle)) throw new Error("crypto");
+  let plain;
+  try {
+    const key = await crypto.subtle.importKey("raw", b64(k), {name: "AES-CBC"}, false, ["decrypt"]);
+    plain = await crypto.subtle.decrypt({name: "AES-CBC", iv: raw.slice(0, 16)}, key, raw.slice(16));
+  } catch (e) { throw new Error("key"); }
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+/* ───── общие куски ───── */
+const TITLE = {jobs: "Вакансии", news: "Новости", shtab: "Штаб"};
+function head(D, lead) {
+  const d = day(D.date);
+  const old = daysTo(D.date) < 0;
+  return [
+    h("div", {class: "date"}, longDate(d)),
+    h("h1", null, TITLE[S]),
+    lead ? h("p", {class: "lead"}, lead) : null,
+    old ? h("div", {class: "stale"}, `Это сводка за ${shortDate(d)}. Свежая придёт утром, к 9:30.`) : null,
+  ];
+}
+function empty(title, text) { return h("div", {class: "empty"}, h("b", null, title), text); }
+function section(title, count, ...kids) {
+  return [h("h2", null, title, count ? h("small", null, String(count)) : null), ...kids];
+}
+const failed = () => empty("Сегодня не собралось", "Напиши в чат «Новости» — разберусь.");
+
+/* ───── Вакансии ───── */
+const FIT = {
+  yes: {c: "var(--green)", pill: "Подходит тебе"},
+  maybe: {c: "var(--orange)", pill: "Под вопросом"},
+  no: {c: "var(--red)", pill: "Скорее нет"},
+  "": {c: "var(--gray)", pill: "Без разбора"},
+};
+const ICON = {game: "🎮", qa: "🔎", support: "💬"};
+function jobSub(j) {
+  const bits = [known(j.org) ? j.org : j.source];
+  if (j.chips && j.chips[0]) bits.push(j.chips[0].toLowerCase());
+  else if (j.place) bits.push(j.place);
+  if (known(j.salary) && j.salary.length <= 24) bits.push(j.salary);
+  return bits.filter(Boolean).join(", ");
+}
+function jobRow(j) {
+  return h("button", {class: "row", onclick: () => openJob(j)},
+    h("span", {class: "tile", style: `--c:${FIT[j.fit || ""].c}`}, ICON[j.group] || "💼"),
+    h("span", {class: "body"}, h("span", {class: "t"}, j.name || j.title), h("span", {class: "s"}, jobSub(j))),
+    h("span", {class: "chev"}));
+}
+function jobs(D) {
+  const J = D.jobs || {};
+  const all = J.items || [];
+  const yes = all.filter(j => j.fit === "yes"), maybe = all.filter(j => j.fit === "maybe" || !j.fit), no = all.filter(j => j.fit === "no");
+  const parts = [];
+  if (yes.length) parts.push(`${yes.length} ${plural(yes.length, "подходит", "подходят", "подходят")} тебе`);
+  if (maybe.length) parts.push(`${maybe.length} под вопросом`);
+  const out = head(D, J.ok === false ? null : all.length ? parts.join(", ") || "Подходящих сегодня нет" : null);
+  if (J.ok === false) return [...out, failed()];
+  if (!all.length) return [...out, empty("Новых вакансий нет", "Завтра в 09:50 проверю снова.")];
+  if (yes.length) out.push(...section("Подходят", 0, h("div", {class: "group"}, yes.map(jobRow))));
+  if (maybe.length) out.push(...section("Под вопросом", 0, h("div", {class: "group"}, maybe.map(jobRow))));
+  if (no.length) {
+    const fold = h("div", {class: "fold"}, no.map(j => h("button", {class: "row plain", onclick: () => openJob(j)},
+      h("span", {class: "dot", style: "--c:var(--red);margin:0 6px 0 2px"}),
+      h("span", {class: "body"}, h("span", {class: "t"}, j.name || j.title), h("span", {class: "s"}, j.risk || j.fit_why || "")))));
+    const toggle = h("button", {class: "row", onclick: () => { haptic(); fold.classList.toggle("open"); toggle.querySelector(".chev").style.transform = fold.classList.contains("open") ? "rotate(135deg)" : ""; }},
+      h("span", {class: "tile", style: "--c:var(--red)"}, "✕"),
+      h("span", {class: "body"}, h("span", {class: "t more"}, `Отсеял ${no.length}`), h("span", {class: "s"}, "Тебе скорее не подходят")),
+      h("span", {class: "chev"}));
+    out.push(h("div", {class: "group", style: "margin-top:30px"}, toggle, fold));
+  }
+  out.push(h("p", {class: "note-line"},
+    "Понравилась вакансия — нажми «Хочу откликнуться» и вставь в чат «Новая работа». Сам никуда не откликаюсь." +
+    (J.rest ? ` Ещё ${J.rest} — в следующих сводках.` : "")));
+  return out;
+}
+function openJob(j) {
+  const f = FIT[j.fit || ""];
+  const facts = [["Зарплата", j.salary], ["Формат", j.format], ["Английский", j.english], ["Опыт", j.experience],
+    ["Что делать", j.tasks], ["Требования", j.requirements], ["Что дают", j.offer]].filter(([, v]) => v);
+  const sheet = document.getElementById("sheet");
+  sheet.replaceChildren(
+    h("div", {class: "grab"}),
+    h("span", {class: "pill", style: `--c:${f.c}`}, f.pill),
+    h("h3", null, j.name || j.title),
+    h("div", {class: "org"}, j.company || j.org || j.source),
+    j.chips && j.chips.length ? h("div", {class: "chips"}, j.chips.map(c => h("span", {class: "chip"}, c))) : null,
+    j.short ? h("p", {class: "lede"}, j.short) : null,
+    j.plus || j.risk ? h("div", {class: "notes"},
+      j.plus ? h("div", {class: "note", style: "--c:var(--green)"}, h("span", {class: "mark"}, "✓"), h("span", null, j.plus)) : null,
+      j.risk ? h("div", {class: "note", style: "--c:var(--orange)"}, h("span", {class: "mark"}, "!"), h("span", null, j.risk)) : null) : null,
+    facts.length ? h("div", {class: "facts"}, facts.map(([k, v]) => h("div", {class: "fact"}, h("span", null, k), h("div", null, v)))) : null,
+    h("p", {class: "orig"}, `${j.title} — ${j.source}` + (j.date ? `, ${shortDate(day(j.date))}` : "")),
+    h("div", {class: "btns"},
+      h("button", {class: "btn main", onclick: () => openLink(j.url)}, "Открыть вакансию"),
+      h("button", {class: "btn alt", onclick: async () => {
+        const ok = await copy(`Хочу откликнуться: ${j.name || j.title} (${j.org || j.source})\n${j.url}`);
+        haptic("medium");
+        toast(ok ? "Скопировал. Вставь в чат «Новая работа»" : "Не скопировалось. Открой вакансию и пришли ссылку");
+      }}, "Хочу откликнуться")));
+  sheet.scrollTop = 0;
+  document.body.classList.add("open-sheet");
+  haptic("light");
+  if (tg && tg.BackButton) { tg.BackButton.show(); }
+}
+function closeSheet() {
+  document.body.classList.remove("open-sheet");
+  if (tg && tg.BackButton) tg.BackButton.hide();
+}
+document.getElementById("shade").addEventListener("click", closeSheet);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+/* ───── Новости ───── */
+const SRC = [
+  [/anthropic\.com|claude\.(ai|com)/, "Anthropic", "#D4A27F", "A"],
+  [/github\.com/, "GitHub", "#3A3A3C", "G"],
+  [/simonwillison\.net/, "Simon Willison", "#0A84FF", "S"],
+  [/ycombinator\.com/, "Hacker News", "#FF6600", "Y"],
+  [/openai\.com/, "OpenAI", "#10A37F", "O"],
+  [/google|deepmind|blog\.google/, "Google", "#4285F4", "G"],
+  [/theverge\.com/, "The Verge", "#5E5CE6", "V"],
+  [/techcrunch\.com/, "TechCrunch", "#30D158", "T"],
+];
+function source(url) {
+  let host = "";
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch (e) {}
+  for (const [re, name, c, l] of SRC) if (re.test(host)) return {name, c, l};
+  return {name: host || "Источник", c: "#48484A", l: (host[0] || "•").toUpperCase()};
+}
+const FLAG = {romania: "🇷🇴", ukraine: "🇺🇦", world: "🌍", games: "🎮", ai: "🤖"};
+function newsCard(x) {
+  const s = source(x.url);
+  return h("button", {class: "card", onclick: () => openLink(x.url)},
+    h("div", {class: "src"}, h("span", {class: "logo", style: `--c:${s.c}`}, s.l), s.name),
+    h("h3", null, x.title), x.what ? h("p", null, x.what) : null,
+    x.use ? h("div", {class: "us"}, h("b", null, "Нам"), x.use) : null);
+}
+function news(D) {
+  const N = D.news || {};
+  const ai = N.ai || [], big = N.action || [];
+  const lead = N.ok === false ? null : (big.length ? `Есть экшен: ${big.length}. ` : "Экшена нет. ") +
+    (ai.length ? `${ai.length} ${plural(ai.length, "новость", "новости", "новостей")} про ИИ.` : "") +
+    ((N.words || []).length ? ` В конце — ${N.words.length} ${plural(N.words.length, "новое слово", "новых слова", "новых слов")}.` : "");
+  const out = head(D, lead);
+  if (N.ok === false) return [...out, failed()];
+  if (big.length) out.push(...section("Экшен", 0, big.map(b => h("button", {class: "card big", onclick: () => openLink(b.url)},
+    h("div", {class: "flag"}, FLAG[b.topic] || "🔥"), h("h3", null, b.title), b.what ? h("p", null, b.what) : null))));
+  out.push(...section("ИИ — что применить", 0));
+  if (ai.length) out.push(...ai.map(newsCard));
+  else out.push(empty("Нового и полезного нет", N.none || "Завтра посмотрю снова."));
+  const words = N.words || [];
+  if (words.length) out.push(...section("📖 Новые слова", 0, h("div", {class: "group words"}, words.map(w =>
+    h("div", {class: "row plain"}, h("span", {class: "body"}, h("span", {class: "t"}, w.word), h("span", {class: "s"}, w.meaning)))))));
+  return out;
+}
+
+/* ───── Штаб ───── */
+const STATE = {
+  go: {c: "var(--green)", t: "идёт"}, slow: {c: "var(--yellow)", t: "медленно"},
+  stuck: {c: "var(--red)", t: "застряло"}, pause: {c: "var(--gray)", t: "пауза"},
+};
+function shtab(D) {
+  const T = D.shtab || {};
+  const out = head(D, T.ok === false ? null : T.headline);
+  if (T.ok === false) return [...out, failed()];
+  const cd = T.countdown;
+  if (cd && cd.date && daysTo(cd.date) >= 0) {
+    const n = daysTo(cd.date);
+    out.push(h("div", {class: "count"},
+      h("div", {class: "n"}, String(n)),
+      h("div", {class: "what"}, n === 0 ? `Сегодня: ${cd.title}` : `${plural(n, "день", "дня", "дней")} ${cd.until || "до: " + cd.title}`),
+      h("div", {class: "when"}, cap(shortDate(day(cd.date))) + (cd.note ? `. ${cd.note}` : ""))));
+  }
+  const P = T.projects || [];
+  if (P.length) out.push(...section("Куда идём", 0, h("div", {class: "group"}, P.map(p => {
+    const st = STATE[p.state] || STATE.go;
+    return h("div", {class: "row"}, h("span", {class: "tile", style: `--c:${st.c}`}, p.icon || "•"),
+      h("span", {class: "body"}, h("span", {class: "t"}, p.name), h("span", {class: "s"}, p.line)),
+      p.state && p.state !== "go" ? h("span", {class: "state", style: `--c:${st.c}`}, st.t) : null);
+  }))));
+  const list = (items, c, mark) => h("div", {class: "group"}, items.map(x => h("div", {class: "row plain"},
+    h("span", {class: "mark", style: `--c:${c}`}, mark),
+    h("span", {class: "body"}, h("span", {class: "t", style: "font-weight:500"}, x.text || x),
+      x.chat ? h("span", {class: "chat"}, `Чат «${x.chat}»`) : null))));
+  if ((T.done || []).length) out.push(...section("Получилось", 0, list(T.done, "var(--green)", "✓")));
+  if ((T.decide || []).length) out.push(...section("Надо решить", T.decide.length, list(T.decide, "var(--blue)", "?")));
+  if ((T.problems || []).length) out.push(...section("Проблемки", 0, list(T.problems, "var(--orange)", "!")));
+  const soon = (T.soon || []).filter(x => x.date && daysTo(x.date) >= 0);
+  if (soon.length) out.push(...section("Скоро", 0, h("div", {class: "group"}, soon.map(x => {
+    const d = day(x.date), n = daysTo(x.date);
+    return h("div", {class: "row"},
+      h("span", {class: "cal"}, h("i", null, d.toLocaleDateString("ru-RU", {weekday: "short"})), h("b", null, String(d.getDate()))),
+      h("span", {class: "body"}, h("span", {class: "t", style: "font-weight:500"}, x.text),
+        h("span", {class: "s"}, n === 0 ? "Сегодня" : n === 1 ? "Завтра" : `Через ${n} ${plural(n, "день", "дня", "дней")}`)));
+  }))));
+  if (T.paused) out.push(h("p", {class: "note-line"}, T.paused));
+  return out;
+}
+
+/* ───── простой вид: только текст и ссылки, если красивый не нарисовался ───── */
+function plain(D) {
+  const box = document.createElement("div");
+  const add = (tag, text, cls, url) => {
+    const el = document.createElement(tag);
+    el.textContent = text || "";
+    if (cls) el.className = cls;
+    if (url) el.addEventListener("click", () => openLink(url));
+    box.appendChild(el);
+    return el;
+  };
+  const J = D.jobs || {}, N = D.news || {}, T = D.shtab || {};
+  if (S === "jobs") for (const j of J.items || [])
+    add("p", (j.fit === "yes" ? "✅ " : j.fit === "no" ? "❌ " : "🤔 ") + (j.name || j.title) + " — " + (j.org || j.source || "") + (j.short ? ". " + j.short : ""), "plain", j.url);
+  if (S === "news") {
+    for (const x of (N.action || []).concat(N.ai || []))
+      add("p", "• " + x.title + (x.what ? ". " + x.what : "") + (x.use ? " Нам: " + x.use : ""), "plain", x.url);
+    for (const w of N.words || []) add("p", "📖 " + w.word + " — " + w.meaning, "plain");
+  }
+  if (S === "shtab") {
+    if (T.headline) add("p", T.headline, "plain");
+    for (const x of T.decide || []) add("p", "❓ " + x.text + (x.chat ? " (чат «" + x.chat + "»)" : ""), "plain");
+    for (const x of T.problems || []) add("p", "⚠️ " + x.text, "plain");
+    for (const x of T.done || []) add("p", "✅ " + (x.text || x), "plain");
+    for (const x of T.soon || []) add("p", "📅 " + x.date.split("-").reverse().slice(0, 2).join(".") + " — " + x.text, "plain");
+  }
+  return box;
+}
+function techInfo(e) {
+  const line = String((e && e.stack) || "").split("\n")[0];
+  return h("p", {class: "tech"}, "Для Claude: " + String((e && (e.name + ": " + e.message)) || e).slice(0, 160) + (line ? " | " + line.slice(0, 120) : ""));
+}
+
+/* ───── запуск ───── */
+async function start() {
+  if (tg) {
+    try { tg.ready(); tg.expand(); } catch (e) {}
+    try { tg.setHeaderColor("#000000"); tg.setBackgroundColor("#000000"); tg.setBottomBarColor && tg.setBottomBarColor("#000000"); } catch (e) {}
+    try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+    try { tg.BackButton.onClick(closeSheet); } catch (e) {}
+  }
+  const app = document.getElementById("app");
+  let D;
+  try { D = await load(); }
+  catch (e) {
+    const why = {
+      nokey: ["Открой через бота", "Эта страница открывается кнопкой «Вакансии», «Новости» или «Штаб» в боте «Новости» — в самом новом сообщении."],
+      net: ["Нет связи", "Не достучался до сайта. Проверь интернет."],
+      key: ["Ключ не подошёл", "Нажми кнопку в самом новом сообщении бота. Не поможет — напиши в чат «Новости»: «ключ не подошёл»."],
+      crypto: ["Телефон не открыл", "Этот телефон не умеет расшифровывать. Напиши в чат «Новости»: «телефон не открыл»."],
+    }[e.message] || ["Не загрузилось", "Напиши в чат «Новости»: «не загрузилось»."];
+    app.replaceChildren(empty(why[0], why[1]),
+      h("div", {class: "btns"}, h("button", {class: "btn alt", onclick: () => location.reload()}, "Попробовать ещё раз")),
+      e.message === "nokey" ? null : techInfo(e));
+    return;
+  }
+  const view = {jobs, news, shtab}[S] || jobs;
+  try {
+    app.replaceChildren(...view(D).filter(Boolean));
+    const n = Number(new URLSearchParams(location.search).get("open"));  // ?open=1 — сразу открыть вакансию №1
+    if (S === "jobs" && n && D.jobs && D.jobs.items && D.jobs.items[n - 1]) openJob(D.jobs.items[n - 1]);
+  }
+  catch (e) {
+    console.error(e);
+    // красивый вид не нарисовался — показываем то же простым списком, чтобы информация была
+    app.textContent = "";
+    try { app.appendChild(h("h1", null, TITLE[S] || "Утро")); } catch (e2) {}
+    try { app.appendChild(plain(D)); } catch (e2) {}
+    try { app.appendChild(techInfo(e)); } catch (e2) { const t = document.createElement("p"); t.className = "tech"; t.textContent = String(e); app.appendChild(t); }
+  }
+}
+start();
+})();
+</script>
+</body>
+</html>
